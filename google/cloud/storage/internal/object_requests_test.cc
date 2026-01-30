@@ -733,6 +733,13 @@ ObjectMetadata CreateObjectMetadataForTest() {
       "contentEncoding": "an-encoding",
       "contentLanguage": "a-language",
       "contentType": "application/octet-stream",
+      "contexts": {
+        "custom": {
+          "environment": {
+            "value": "preprod"
+          }
+       }
+      },
       "crc32c": "deadbeef",
       "customerEncryption": {
         "encryptionAlgorithm": "some-algo",
@@ -961,6 +968,35 @@ TEST(PatchObjectRequestTest, DiffResetMetadata) {
 
   auto patch = nlohmann::json::parse(request.payload());
   auto expected = nlohmann::json::parse(R"""({"metadata": null})""");
+  EXPECT_EQ(expected, patch);
+}
+
+TEST(PatchObjectRequestTest, DiffSetContexts) {
+  ObjectMetadata original = CreateObjectMetadataForTest();
+  ObjectMetadata updated = original;
+  ObjectContexts object_contexts;
+
+  object_contexts.upsert_custom("environment", ObjectCustomContextPayload{"prod", {},{}});
+  object_contexts.upsert_custom("otherkey", ObjectCustomContextPayload{"othervalue", {}, {}});
+  updated.set_contexts(std::move(object_contexts));
+  PatchObjectRequest request("test-bucket", "test-object", original, updated);
+
+  auto patch = nlohmann::json::parse(request.payload());
+  auto expected = nlohmann::json::parse(R"""({
+      "contexts": {"custom": {"environment": {"value": "prod"}, "otherkey": {"value": "othervalue"}}}
+  })""");
+  EXPECT_EQ(expected, patch);
+}
+
+TEST(PatchObjectRequestTest, DiffResetContexts) {
+  ObjectMetadata original = CreateObjectMetadataForTest();
+  ObjectMetadata updated = original;
+  updated.reset_contexts();
+
+  PatchObjectRequest request("test-bucket", "test-object", original, updated);
+
+  auto patch = nlohmann::json::parse(request.payload());
+  auto expected = nlohmann::json::parse(R"""({"contexts": {"custom": null}})""");
   EXPECT_EQ(expected, patch);
 }
 

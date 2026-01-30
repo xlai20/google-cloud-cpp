@@ -38,6 +38,13 @@ bool IsSet(std::chrono::system_clock::time_point tp) {
 }
 }  // namespace
 
+namespace {
+// Helper function to check if a time point is set (i.e. not the default value).
+bool IsSet(std::chrono::system_clock::time_point tp) {
+  return tp != std::chrono::system_clock::time_point{};
+}
+}  // namespace
+
 namespace google {
 namespace cloud {
 namespace storage {
@@ -66,6 +73,35 @@ struct ObjectBasicCRUDIntegrationTest
       options.set<EndpointOption>(endpoint + ":443");
     }
     return MakeIntegrationTestClient(std::move(options));
+  }
+
+  void SetUp() override {
+    // 1. Run the base class SetUp first. This initializes 'bucket_name_'
+    //    from the environment variable.
+    ::google::cloud::storage::testing::ObjectIntegrationTest::SetUp();
+
+    // 2. Create a client to interact with the emulator/backend.
+    auto client = MakeIntegrationTestClient();
+
+    // 3. Check if the bucket exists.
+    auto metadata = client.GetBucketMetadata(bucket_name_);
+
+    // 4. If it's missing (kNotFound), create it.
+    if (metadata.status().code() == StatusCode::kNotFound) {
+      // Use a default project ID if the env var isn't set (common in local
+      // emulators).
+      auto project_id = google::cloud::internal::GetEnv("GOOGLE_CLOUD_PROJECT")
+                            .value_or("test-project");
+
+      auto created = client.CreateBucketForProject(bucket_name_, project_id,
+                                                   BucketMetadata());
+      ASSERT_STATUS_OK(created)
+          << "Failed to auto-create missing bucket: " << bucket_name_;
+    } else {
+      // If it exists (or failed for another reason), assert it is OK.
+      ASSERT_STATUS_OK(metadata)
+          << "Failed to verify bucket existence: " << bucket_name_;
+    }
   }
 };
 
@@ -167,6 +203,8 @@ TEST_F(ObjectBasicCRUDIntegrationTest, BasicCRUD) {
   desired_patch.set_content_language("en");
   desired_patch.mutable_metadata().erase("updated");
   desired_patch.mutable_metadata().emplace("patched", "true");
+  desired_patch.set_contexts(
+      ObjectContexts{{{"test-key", {"test-custom-value-patched", {}, {}}}}});
   StatusOr<ObjectMetadata> patched_meta =
       client.PatchObject(bucket_name_, object_name, *updated_meta,
                          desired_patch, PredefinedAcl::Private());
@@ -175,6 +213,9 @@ TEST_F(ObjectBasicCRUDIntegrationTest, BasicCRUD) {
   EXPECT_EQ(desired_patch.metadata(), patched_meta->metadata())
       << *patched_meta;
   EXPECT_EQ(desired_patch.content_language(), patched_meta->content_language())
+      << *patched_meta;
+  EXPECT_EQ("test-custom-value-patched",
+            patched_meta->contexts().get_custom("test-key").value)
       << *patched_meta;
 
   // This is the test for Object CRUD, we cannot rely on `ScheduleForDelete()`.

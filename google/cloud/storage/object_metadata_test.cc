@@ -184,7 +184,6 @@ TEST(ObjectMetadataTest, Parse) {
                 ObjectRetentionUnlocked(),
                 google::cloud::internal::ParseRfc3339("2024-07-18T00:00:00Z")
                     .value()}));
-
   EXPECT_EQ("https://storage.googleapis.com/storage/v1/b/foo-bar/o/baz",
             actual.self_link());
   EXPECT_EQ(102400, actual.size());
@@ -885,6 +884,29 @@ TEST(ObjectMetadataPatchBuilder, ResetMetadata) {
   nlohmann::json expected{
       {"metadata", nullptr},
   };
+  EXPECT_EQ(expected, actual_as_json) << actual;
+}
+
+TEST(ObjectMetadataPatchBuilder, SetContexts) {
+  ObjectMetadataPatchBuilder builder;
+  ObjectContexts ctx;
+  ctx.upsert_custom("HOD", ObjectCustomContextPayload{"Alice", {}, {}});
+  builder.SetContexts(ctx);
+
+  auto actual = builder.BuildPatch();
+  auto actual_as_json = nlohmann::json::parse(actual);
+  nlohmann::json expected{
+      {"contexts", {{"custom", nlohmann::json{{"HOD", {{"value", "Alice"}}}}}}}};
+  EXPECT_EQ(expected, actual_as_json) << actual;
+}
+
+TEST(ObjectMetadataPatchBuilder, ResetContexts) {
+  ObjectMetadataPatchBuilder builder;
+  builder.ResetContexts();
+
+  auto actual = builder.BuildPatch();
+  auto actual_as_json = nlohmann::json::parse(actual);
+  nlohmann::json expected{{"contexts", nullptr}};
   EXPECT_EQ(expected, actual_as_json) << actual;
 }
 

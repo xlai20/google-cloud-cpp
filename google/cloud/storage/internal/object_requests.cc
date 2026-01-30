@@ -97,6 +97,20 @@ ObjectMetadataPatchBuilder DiffObjectMetadata(ObjectMetadata const& original,
     }
   }
 
+  if (updated.has_contexts() && original.contexts() != updated.contexts()) {
+    auto const& updated_custom = updated.contexts().custom;
+
+    if (updated_custom.empty()) {
+      builder.ResetContexts();
+    } else {
+      ObjectContexts contexts;
+      for (auto const& kv : updated_custom) {
+        contexts.upsert_custom(kv.first, kv.second);
+      }
+      builder.SetContexts(contexts);
+    }
+  }
+
   if (original.temporary_hold() != updated.temporary_hold()) {
     builder.SetTemporaryHold(updated.temporary_hold());
   }

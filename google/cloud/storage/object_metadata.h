@@ -700,6 +700,9 @@ class ObjectMetadataPatchBuilder {
   ObjectMetadataPatchBuilder& ResetMetadata(std::string const& key);
   ObjectMetadataPatchBuilder& ResetMetadata();
 
+  ObjectMetadataPatchBuilder& SetContexts(ObjectContexts const& tp);
+  ObjectMetadataPatchBuilder& ResetContexts();
+
   ObjectMetadataPatchBuilder& SetTemporaryHold(bool v);
   ObjectMetadataPatchBuilder& ResetTemporaryHold();
 

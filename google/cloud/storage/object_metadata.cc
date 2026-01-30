@@ -277,6 +277,25 @@ ObjectMetadataPatchBuilder& ObjectMetadataPatchBuilder::ResetMetadata() {
   return *this;
 }
 
+ObjectMetadataPatchBuilder& ObjectMetadataPatchBuilder::SetContexts(
+    ObjectContexts const& tp) {
+  internal::PatchBuilder custom_subpatch;
+  for (auto const& pair : tp.custom) {
+    custom_subpatch.AddSubPatch(
+        pair.first.c_str(),
+        internal::PatchBuilder()
+            .SetStringField("value", pair.second.value));
+  }
+  impl_.AddSubPatch("contexts", internal::PatchBuilder().AddSubPatch(
+                                    "custom", custom_subpatch));
+  return *this;
+}
+
+ObjectMetadataPatchBuilder& ObjectMetadataPatchBuilder::ResetContexts() {
+  impl_.RemoveField("contexts");
+  return *this;
+}
+
 ObjectMetadataPatchBuilder& ObjectMetadataPatchBuilder::SetTemporaryHold(
     bool v) {
   impl_.SetBoolField("temporaryHold", v);
